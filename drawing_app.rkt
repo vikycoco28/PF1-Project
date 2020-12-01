@@ -1,114 +1,134 @@
-;; The first three lines of this file were inserted by DrRacket. They record metadata
-;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname drawing_app) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+; Use (draw-app IS) to run
+
 (require 2htdp/image)
 (require 2htdp/universe)
 
-(define-struct tool [type size color x0 y0])
+; Constants for now
+(define S-SIZE 10)
+(define S-COLOR "black")
+(define INITIAL-CANVAS (rectangle 600 600 "solid" "white"))
 
-(define-struct appstate [canvas pre post tool quit])
-
-(define START-CANVAS (rectangle 600 600 "solid" "white"))
-
-(define SS
-  (make-appstate
-   START-CANVAS
-   '()
-   '()
-   (make-tool "line" 10 "red" 0 0)
-   #false))
-
-; Getting tool values
-
-(define (s.tool a)
-  (appstate-tool a))
-
-(define (t-type a)
-  (tool-type (s.tool a)))
-
-(define (t-size a)
-  (tool-size (s.tool a)))
-
-(define (t-color a)
-  (tool-color (s.tool a)))
-
-; ====================================================================================
-; Rendering
-
-(define (render a)
-  (overlay (above (text (number->string (tool-x0 (appstate-tool a))) 24 "black")
-                  (text (number->string (tool-y0 (appstate-tool a))) 24 "black"))
-           (appstate-canvas a)))
+; Tool Structure
+; where type: String
+;             determines the events linked to the tool
+;       size: Number
+;       color: Structure (make-color)
+;       start: Maybe<posn>
+;       status: Boolean
+;               is the tool active?
+(define-struct tool [type size color start status])
 
 ; ====================================================================================
 ; Line Tool
+; [!] could use some abstraction [!]
 
-(define (start-line a x y)
+; Begin line
+(define (line-start a x y)
   (make-appstate
-   (add-line
-    (appstate-canvas a)
-    x y x y
-    (t-color a))
+   (appstate-canvas a)
    (appstate-pre a)
    (appstate-post a)
-   (make-tool "line" (t-size a) (t-color a) x y)
-   #false))
-
-(define (move-end a x y)
-  (make-appstate
-   (add-line
-    (appstate-canvas a)
-    (tool-x0 (s.tool a)) (tool-y0 (s.tool a)) x y
-    (t-color a))
-    (appstate-pre a)
-    (appstate-post a)
-    (s.tool a)
+   (make-tool
+    (tool-type (appstate-tool a))
+    (tool-size (appstate-tool a))
+    (tool-color (appstate-tool a))
+    (make-posn x y) ;start
+    #true)
     #false))
 
-(define (add-to-canvas a x y)
+; Move end point
+; [!] line doesn't appear until button is released [!]
+(define (line-drag a x y)
+  (cond [(tool-status (appstate-tool a)) a]
+        [else
+         (make-appstate
+          (line-draw a x y)
+          (appstate-pre a)
+          (appstate-post a)
+          (appstate-tool a)
+          #false)]))
+
+; Aux
+(define (line-draw a x y)
+  (add-line
+   (appstate-canvas a)
+   (posn-x (tool-start (appstate-tool a)))
+   (posn-y (tool-start (appstate-tool a)))
+   x y
+   S-COLOR))
+
+; Place on canvas
+(define (line-place a x y)
   (make-appstate
-   (add-line
-    (appstate-canvas a)
-    (tool-x0 (s.tool a)) (tool-y0 (s.tool a)) x y
-    (t-color a))
-   (cons (appstate-pre a)
-         (appstate-canvas a))
+   (line-draw a x y)
+   (cons (appstate-canvas a)
+         (appstate-pre a))
    '()
-   (make-tool "line" (t-size a) (t-color a) x y)
+   (make-tool
+    (tool-type (appstate-tool a))
+    (tool-size (appstate-tool a))
+    (tool-color (appstate-tool a))
+    #false
+    #false)
    #false))
 
-; Line Handler
-(define (handle-line a event x y)
-  (cond [(string=? event "button-down") (start-line a x y)]
-        [(string=? event "drag") (move-end a x y)]
-        [(string=? event "button-up") (add-to-canvas a x y)]))
+; -----------------------------------------------------------------------------------
+
+; Line Actions
+; line-a : AppState Number Number String -> [X -> Y]
+; performs the corresponding line action depending on the mouse event
+
+(define (line-a a x y me)
+    (cond [(string=? me "button-down")
+           (line-start a x y)]
+          [(string=? me "drag")
+           (line-drag a x y)]
+          [(string=? me "button-up")
+           (line-place a x y)]
+          [else a]))
+
+; Premade Tool: Line
+(define LINE
+  (make-tool
+   "line"
+   S-SIZE
+   S-COLOR
+   #false
+   #false))
 
 ; ====================================================================================
-; Key Handler
+
+; AppState definition
+(define-struct appstate [canvas pre post tool quit])
+
+; Initial State
+(define IS
+  (make-appstate
+   INITIAL-CANVAS
+   '()
+   '()
+   LINE
+   #false))
 
 ; ====================================================================================
 ; Mouse Handler
 
-(define (handle a type event x y)
-  (cond [(string=? type "line") (handle-line a event x y)]
-        [else a]))
-
 (define (handle-mouse a x y me)
-  (cond [(mouse=? me "button-down")
-         (handle a (t-type a) "button-down" x y)]
-        ;[(mouse=? me "wheel-up")
-         ;(+ (t-size a) 1)]
-        ;[(mouse=? me "wheel-down")
-         ;(- (t-size a) 1)]
-        [else a]))
+  (local ((define type (tool-type (appstate-tool a))))
+    (cond [(string=? type "line")
+           (line-a a x y me)]
+          [else a])))
 
 ; ====================================================================================
-; Final Program
+; Render Function
 
-(define (drawing-app initial-state)
-  (big-bang initial-state
+(define (render a)
+  (appstate-canvas a))
+
+; ====================================================================================
+; Big-Bang
+
+(define (draw-app is)
+  (big-bang is
     [to-draw render]
     [on-mouse handle-mouse]))
-    ;[on-key handle-key]
-    ;[stop-when quit?]))
-  
