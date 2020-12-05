@@ -17,7 +17,9 @@
 ;              (it can also be a number from 0 to 255 that indicates its transparency, with 0 being fully transparent and 255 being "solid")
 ;       x1, y1, x2, y2 : Number
 ;                        represent the coordinates of the current figure/tool
-(define-struct tool [type size color mode x1 y1 x2 y2])
+;       status : Boolean
+;                represents if the tool is active
+(define-struct tool [type size color mode x1 y1 x2 y2 status])
 
 ; a List<Image> is one of:
 ; - '()
@@ -36,7 +38,7 @@
 (define IS (make-appstate EMPTY-CANVAS
                           '()
                           '()
-                          (make-tool "square" 1 "black" "outline" 0 0 0 0)
+                          (make-tool "square" 1 "black" "outline" 0 0 0 0 #false)
                           #false))
  
 ; ==================================================================================================
@@ -48,12 +50,15 @@
 ;; Code
 (define (render app)
   (local ((define type (tool-type (appstate-tool app))))
-    (overlay
-     (cond
-      [(string=? type "square") (draw-square app)]
-     ;[(string=? type "rectangle") (draw-rectangle)]
-      [else (appstate-canvas app)])
-     (appstate-canvas app))))
+    (cond
+      [(tool-status (appstate-tool app))
+       (overlay
+        (cond
+          [(string=? type "square") (draw-square app)]
+          ;[(string=? type "rectangle") (draw-rectangle)]
+          [else (appstate-canvas app)])
+        (appstate-canvas app))]
+      [else (appstate-canvas app)])))
      
 
 ; ==================================================================================================
@@ -122,32 +127,24 @@
 ;; Code
 (define (add-figure-to-canvas app)
   (local ((define type (tool-type (appstate-tool app))))
-    (cond
-      [(string=? type "square") (add-square-to-canvas app)]
-     ;[(string=? type "line") (add-line-to-canvas app)]
-     ;[(string=? type "rectangle") (add-rectangle-to-canvas app)]
+    (make-appstate
+     (cond
+       [(string=? type "square") (draw-square app)]
+       ;[(string=? type "line") (add-line-to-canvas app)]
+       ;[(string=? type "rectangle") (add-rectangle-to-canvas app)]
     
-    [else app])))
-
-;; Input/Output
-; add-square-to-canvas : AppState -> AppState
-; takes an appstate and returns the appstate with the currently drawn square added to the canvas
-
-;; Code
-(define (add-square-to-canvas app)
-  (local
-    ((define S (square-size (appstate-tool app)))
-     (define X1 (tool-x1 (appstate-tool app)))
-     (define X2 (tool-x2 (appstate-tool app)))
-     (define Y1 (tool-y1 (appstate-tool app)))
-     (define Y2 (tool-y2 (appstate-tool app))))  
-  (make-appstate
-   (draw-square app)
-   (cons (appstate-canvas app)
+       [else (appstate-canvas app)])
+     (cons (appstate-canvas app)
          (appstate-pre app))
-   '()
-   (appstate-tool app)
-   (appstate-quit app))))
+     '()
+     (make-tool (tool-type (appstate-tool app))
+                (tool-size (appstate-tool app))
+                (tool-color (appstate-tool app))
+                (tool-mode (appstate-tool app))
+                0 0 0 0                           ; x1,y1,x2,y2 set to 0
+                #false)                           ; tool set to not active    
+     (appstate-quit app))))
+    
 
 ;; Input/Output
 ; move-end : AppState New-x New-y -> Appstate
@@ -167,7 +164,8 @@
                                 (tool-x1 (appstate-tool app))
                                 (tool-y1 (appstate-tool app))
                                 new-x
-                                new-y)
+                                new-y
+                                (tool-status (appstate-tool app)))
                      (appstate-quit app))))
 
 ; ==================================================================================================
@@ -222,7 +220,8 @@
                                         (tool-size (appstate-tool a))
                                         (tool-color (appstate-tool a))
                                         (tool-mode (appstate-tool a))
-                                        x y x y)
+                                        x y x y
+                                        #true)                         ; the tool is set to active
                              (appstate-quit a))]
              [(string=? me "drag")
               (move-end a x y)]
@@ -252,7 +251,8 @@
               (tool-x1 (appstate-tool a))
               (tool-y1 (appstate-tool a))
               (tool-x2 (appstate-tool a))
-              (tool-y2 (appstate-tool a)))
+              (tool-y2 (appstate-tool a))
+              (tool-status (appstate-tool a)))
    (appstate-quit a)))
 
 ; handle-key: AppState KeyEvent -> AppState
