@@ -42,7 +42,7 @@
    EMPTY-CANVAS
    '()
    '()
-   (make-tool "square" 1 "black" "outline" 0 0 0 0 #false #false)
+   (make-tool "free" 1 "black" "outline" 0 0 0 0 #false #false)
    #false))
 
 ; ========================================================================================
@@ -100,24 +100,26 @@
 ; it takes an AppState and returns the current Canvas
 
 ;; Code
-(define (render0 app)
+(define (render app)
   (local ((define type (tool-type (appstate-tool app))))
     (cond
       [(tool-status (appstate-tool app))
         (cond
           [(string=? type "free") (draw-free app)]
           [(string=? type "line") (draw-line app)]
-          [(string=? type "square") (draw-square app)]
-          ;[(string=? type "rectangle") (draw-rectangle)]
+          [(string=? type "square") (draw-figure app)]
+          [(string=? type "rectangle") (draw-figure app)]
+          [(string=? type "circle") (draw-figure app)]
+          [(string=? type "ellipse") (draw-figure app)]
           [else (appstate-canvas app)])]
       [else (appstate-canvas app)])))
 
-(define (render app)
-  (local ((define value (tool-extra (appstate-tool app))))
-    (overlay (cond [(false? value) (text "none" 20 "black")]
-                   [(cons? value)
-                    (text (number->string (length value)) 20 "black")])
-             (appstate-canvas app))))
+;(define (render app)
+;  (local ((define value (tool-extra (appstate-tool app))))
+;    (overlay (cond [(false? value) (text "none" 20 "black")]
+;                   [(cons? value)
+;                    (text (number->string (length value)) 20 "black")])
+;             (appstate-canvas app))))
 
 ; ===================================================================================
 ; Line Tool
@@ -221,63 +223,96 @@
    (appstate-quit a)))
 
 ; ==================================================================================================
+; Rectangle/Square/Circle/Ellipse Tool
 
 ;; Input/Output
-; draw-square : AppState -> Image
-; it takes an AppState and returns the Canvas with the currently drawn square
+; draw-figure : AppState -> Image
+; it takes an AppState and returns the Canvas with the currently drawn figure (square, rectangle, circle or ellipse)
 
 ;; Code
-(define (draw-square app)
+(define (draw-figure app)
   (local
-    ((define S (square-size (appstate-tool app)))
+    ((define H (figure-height (appstate-tool app)))
+     (define W (figure-width (appstate-tool app)))
      (define MODE (tool-mode (appstate-tool app)))
      (define COLOR (tool-color (appstate-tool app)))
      (define X1 (tool-x1 (appstate-tool app)))
      (define X2 (tool-x2 (appstate-tool app)))
      (define Y1 (tool-y1 (appstate-tool app)))
-     (define Y2 (tool-y2 (appstate-tool app))))
+     (define Y2 (tool-y2 (appstate-tool app)))
+     (define FIGURE (cond
+                      [(or (string=? "square" (tool-type (appstate-tool app)))
+                           (string=? "rectangle" (tool-type (appstate-tool app))))
+                       (rectangle W H MODE COLOR)]
+                      [(or (string=? "circle" (tool-type (appstate-tool app)))
+                           (string=? "ellipse" (tool-type (appstate-tool app))))
+                       (ellipse W H MODE COLOR)])))
   (cond
     [(and (> X1 X2) (> Y1 Y2))
      (place-image
-      (square S MODE COLOR)
-      (- X1 (/ (integer-sqrt (* 2 (* S S))) 2)) 
-      (- Y1 (/ (integer-sqrt (* 2 (* S S))) 2))
+      FIGURE
+      (- X1 (/ W 2)) 
+      (- Y1 (/ H 2))
       (appstate-canvas app))]
     [(and (< X1 X2) (< Y1 Y2))
      (place-image
-      (square S MODE COLOR)
-      (+ X1 (/ (integer-sqrt (* 2 (* S S))) 2)) 
-      (+ Y1 (/ (integer-sqrt (* 2 (* S S))) 2))
+      FIGURE
+      (+ X1 (/ W 2)) 
+      (+ Y1 (/ H 2))
       (appstate-canvas app))]
     [(and (> X1 X2) (< Y1 Y2))
      (place-image
-      (square S MODE COLOR)
-      (- X1 (/ (integer-sqrt (* 2 (* S S))) 2)) 
-      (+ Y1 (/ (integer-sqrt (* 2 (* S S))) 2))
+      FIGURE
+      (- X1 (/ W 2)) 
+      (+ Y1 (/ H 2))
       (appstate-canvas app))]
     [(and (< X1 X2) (> Y1 Y2))
      (place-image
-      (square S MODE COLOR)
-      (+ X1 (/ (integer-sqrt (* 2 (* S S))) 2)) 
-      (- Y1 (/ (integer-sqrt (* 2 (* S S))) 2))
+      FIGURE
+      (+ X1 (/ W 2)) 
+      (- Y1 (/ H 2))
       (appstate-canvas app))]
     [else (appstate-canvas app)])))
 
 ;; Input/Output
-; square-size : Tool -> Number
-; takes a tool and return the width/height of the currently drawn square
+; figure-height : Tool -> Number
+; takes a tool and return the height of the currently drawn rectangle
 
 ;: Code
-(define (square-size t)
+(define (figure-height t)
   (local ((define X1 (tool-x1 t))
           (define Y1 (tool-y1 t))
           (define X2 (tool-x2 t))
           (define Y2 (tool-y2 t)))
     (cond
-      [(<= (abs (- X2 X1)) (abs (- Y2 Y1)))
-       (abs (- X2 X1))]
-      [else
-       (abs (- Y2 Y1))])))
+      [(or (string=? "square" (tool-type t)) (string=? "circle" (tool-type t)))
+       (cond
+         [(<= (abs (- X2 X1)) (abs (- Y2 Y1)))
+          (abs (- X2 X1))]
+         [else
+          (abs (- Y2 Y1))])]
+      [else (abs (- Y1 Y2))]))) 
+
+;; Input/Output
+; figure-width : Tool -> Number
+; takes a tool and return the width of the currently drawn figure
+
+;: Code
+(define (figure-width t)
+  (local ((define X1 (tool-x1 t))
+          (define Y1 (tool-y1 t))
+          (define X2 (tool-x2 t))
+          (define Y2 (tool-y2 t)))
+    (cond
+      [(or (string=? "square" (tool-type t)) (string=? "circle" (tool-type t)))
+       (cond
+         [(<= (abs (- X2 X1)) (abs (- Y2 Y1)))
+          (abs (- X2 X1))]
+         [else
+          (abs (- Y2 Y1))])]
+      [else (abs (- X1 X2))]))) 
+
+; ==================================================================================================
 
 ;; Input/Output
 ; add-figure-to-canvas : AppState -> AppState
@@ -288,10 +323,11 @@
   (local ((define type (tool-type (appstate-tool app))))
     (make-appstate
      (cond
-       [(string=? type "square") (draw-square app)]
+       [(string=? type "square") (draw-figure app)]
        [(string=? type "line") (draw-line app)]
-       ;[(string=? type "rectangle") (add-rectangle-to-canvas app)]
-    
+       [(string=? type "rectangle") (draw-figure app)]
+       [(string=? type "circle") (draw-figure app)]
+       [(string=? type "ellipse") (draw-figure app)]
        [else (appstate-canvas app)])
      (cons (appstate-canvas app)
          (appstate-pre app))
@@ -359,6 +395,7 @@
           #false)]))
 
 ; ==================================================================================================
+; Mouse Handler
 
 ;; Input/output
 ; handle-mouse : MouseEvent AppState -> AppState
@@ -436,6 +473,9 @@
                 [(string=? k "r") (redo a)]
                 [(string=? k "l") (new-type a "line")]
                 [(string=? k "s") (new-type a "square")]
+                [(string=? k "t") (new-type a "rectangle")]  
+                [(string=? k "c") (new-type a "circle")]
+                [(string=? k "p") (new-type a "ellipse")]
                 [(string=? k "f") (new-type a "free")]
                 [(string=? k "up")
                  (if (>= SIZE 15)   ; if current tool size is >= 10
@@ -458,6 +498,21 @@
 
 ;; Code
 (define (quit? app) (appstate-quit app))
+
+; ==================================================================================================
+
+;; Input/Output
+; start-app : Number -> AppState
+; it takes a number n and starts the application with an initial size n
+; header: (define (start-app n) app)
+
+(define (start-app n)
+  (draw-app (make-appstate
+             (empty-scene n n)
+             '()
+             '()
+             (make-tool "free" 1 "black" "outline" 0 0 0 0 #false #false)
+             #false)))
 
 ; ==================================================================================================
 
