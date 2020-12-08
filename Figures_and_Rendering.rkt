@@ -4,16 +4,16 @@
 (require 2htdp/image)
 (require 2htdp/universe)
 
-(define EMPTY-CANVAS (empty-scene 1000 1000))
+(define EMPTY-CANVAS (rectangle 1000 1000 "solid" "white"))
 
 ;; Data types
 
 ; a Tool is a structure (make-tool type size color mode x1 y1 x2 y2 status)
 ; where type : String
 ;       size : Number
-;       color : Color ;(in 2htdp/image there's already a struct for color, we could use that)
+;       color : Color 
 ;       mode : String or Number
-;              represents the mode for the figures ("outline", "solid", ...)        
+;              represents the mode for the figures ("outline" or "solid")        
 ;              (it can also be a number from 0 to 255 that indicates its transparency, with 0 being fully transparent and 255 being "solid")
 ;       x1, y1, x2, y2 : Number
 ;                        represent the coordinates of the current figure/tool
@@ -96,6 +96,30 @@
 ; ==================================================================================================
 
 ;; Input/Output
+; get-color : Image Number Number -> Color
+; takes an image and two coordinates and returns the color in that point of the image
+; header: (define (get-color img x y) "red")
+
+(define (get-color i x y)
+  (list-ref
+   (image->color-list i)
+   (+ x (* y (image-width i)))))
+
+;; Iput/Output
+; get-color-canvas : AppState -> Color
+; takes an appstate and returns the initial color of the canvas
+; header: (define (get-color-canvas app) "red")
+
+(define (get-color-canvas app)
+  (get-color
+   (list-ref
+    (appstate-pre app)
+    (- (length (appstate-pre app)) 1))
+   0 0))
+
+; ==================================================================================================
+
+;; Input/Output
 ; render : AppState -> Image
 ; it takes an AppState and returns the current Canvas
 
@@ -106,6 +130,7 @@
       [(tool-status (appstate-tool app))
         (cond
           [(string=? type "free") (draw-free app)]
+          [(string=? type "eraser") (draw-free app)]
           [(string=? type "line") (draw-line app)]
           [(string=? type "square") (draw-figure app)]
           [(string=? type "rectangle") (draw-figure app)]
@@ -151,6 +176,7 @@
           (define canvas (appstate-canvas a))
           (define pre (appstate-pre a))
           (define post (appstate-post a))
+          (define type (tool-type (appstate-tool a)))
           (define size (tool-size (appstate-tool a)))
           (define color (tool-color (appstate-tool a)))
           (define mode (tool-mode (appstate-tool a)))
@@ -174,7 +200,7 @@
             pre        ; newest x and y values
             post
             (make-tool
-             "free"
+             type
              size
              color
              mode
@@ -208,6 +234,7 @@
 ; update appstate with freehand line drawn on the canvas
 ; (define (add-free-to-canvas a) a)
 (define (add-free-to-canvas a)
+  (local ((define TYPE (tool-type (appstate-tool a))))
   (make-appstate
    (draw-free a) ; use draw-free to get the canvas with the freehand line drawn
    (cons (appstate-canvas a)
@@ -215,12 +242,14 @@
    '()
    (make-tool (tool-type (appstate-tool a))
               (tool-size (appstate-tool a))
-              (tool-color (appstate-tool a))
-              "solid"
+              (if (string=? "eraser" TYPE)
+                  "black"
+                  (tool-color (appstate-tool a)))
+              (tool-mode (appstate-tool a))
               0 0 0 0  ; x1,y1,x2,y2 set to 0
               #false   ; set extra to #false
               #false)  ; tool set to not active
-   (appstate-quit a)))
+   (appstate-quit a))))
 
 ; ==================================================================================================
 ; Rectangle/Square/Circle/Ellipse Tool
@@ -437,6 +466,27 @@
              [(string=? me "button-up")
               (add-free-to-canvas a)]
              [else a])]
+      ; eraser
+      [(string=? type "eraser")
+       (cond [(string=? me "button-down")
+              (make-appstate
+               canvas
+               pre
+               post
+               (make-tool
+                type
+                size
+                (get-color-canvas a)
+                mode ; use mode to temporarily store a list of posn
+                x y x y
+                (list (make-posn x y))
+                #true)
+               (appstate-quit a))] 
+             [(string=? me "drag")
+              (move-end-free a x y)] ; update end-points + create list of points
+             [(string=? me "button-up")
+              (add-free-to-canvas a)]
+             [else a])]
      ;[(string=? type ...) (...)] -> for the other special tools
       ; tool-type is a figure ---------------------------------------------------------
       [(or (string=? type "line")
@@ -477,6 +527,7 @@
                 [(string=? k "c") (new-type a "circle")]
                 [(string=? k "p") (new-type a "ellipse")]
                 [(string=? k "f") (new-type a "free")]
+                [(string=? k "e") (new-type a "eraser")]
                 [(string=? k "up")
                  (if (>= SIZE 15)   ; if current tool size is >= 10
                      a              ; stop increasing
@@ -487,9 +538,23 @@
                      (dec-size a))]
                 [(string=? k "1") (set-mode-solid a)]   ; change tool mode
                 [(string=? k "2") (set-mode-outline a)] ; current keys are placeholder
+                [(string=? k "q") (quit-app a)]
                 [else a])))
 
 ; ==================================================================================================
+
+;; Input/Output
+; quit-app : AppState -> AppState
+; set quit field of the appstate to #false
+; header: (define (quit-app appstate) app)
+
+(define (quit-app app)
+  (make-appstate
+   (appstate-canvas app)
+   (appstate-pre app)
+   (appstate-post app)
+   (appstate-tool app)
+   #true))
 
 ;; Input/Output
 ; quit? : AppState -> Boolean
@@ -502,13 +567,13 @@
 ; ==================================================================================================
 
 ;; Input/Output
-; start-app : Number -> AppState
+; start-app : Number Number Color -> AppState
 ; it takes a number n and starts the application with an initial size n
 ; header: (define (start-app n) app)
 
-(define (start-app n)
+(define (start-app width height color)
   (draw-app (make-appstate
-             (empty-scene n n)
+             (rectangle width height "solid" color)
              '()
              '()
              (make-tool "free" 1 "black" "outline" 0 0 0 0 #false #false)
