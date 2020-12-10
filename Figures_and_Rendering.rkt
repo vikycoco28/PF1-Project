@@ -101,9 +101,8 @@
 ; header: (define (get-color img x y) "red")
 
 (define (get-color i x y)
-  (list-ref
-   (image->color-list i)
-   (+ x (* y (image-width i)))))
+  (first (image->color-list
+          (crop x y 1 1 i))))
 
 ;; Iput/Output
 ; get-color-canvas : AppState -> Color
@@ -111,11 +110,20 @@
 ; header: (define (get-color-canvas app) "red")
 
 (define (get-color-canvas app)
-  (get-color
-   (list-ref
-    (appstate-pre app)
-    (- (length (appstate-pre app)) 1))
-   0 0))
+  (cond
+    [(empty? (appstate-pre app))
+     (get-color (appstate-canvas app))]
+    [(empty? (rest (appstate-pre app)))
+     (get-color (first (appstate-pre app)) 1 1)]
+    [else
+     (get-color-canvas
+      (make-appstate
+       (appstate-canvas app)
+       (rest (appstate-pre app))
+       (appstate-post app)
+       (appstate-tool app)
+       (appstate-quit app)))]))
+                     
 
 ; ==================================================================================================
 
@@ -238,6 +246,7 @@
   (make-appstate
    (draw-free a) ; use draw-free to get the canvas with the freehand line drawn
    (cons (appstate-canvas a)
+
          (appstate-pre a))
    '()
    (make-tool (tool-type (appstate-tool a))
@@ -395,6 +404,64 @@
                      (appstate-quit app))))
 
 ; ==================================================================================================
+; Fill Tool
+
+;; Input/Output
+; add-fill-in : AppState Number Number -> AppState
+
+(define (add-fill app x y)
+  (local ((define COLOR1 (tool-color (appstate-tool app)))
+          (define COLOR2 (get-color (appstate-canvas app) x y)))
+  (cond
+    [(color=? COLOR1 COLOR2) app]
+    [else (make-appstate
+           (fill (appstate-canvas app) x y COLOR1 COLOR2)
+           (cons (appstate-canvas app)
+                 (appstate-pre app))
+           '()
+           (make-tool (tool-type (appstate-tool app))
+                (tool-size (appstate-tool app))
+                (tool-color (appstate-tool app))
+                (tool-mode (appstate-tool app))
+                0 0 0 0 ; x1,y1,x2,y2 set to 0
+                #false ; set extra to false
+                #false) ; tool set to not active
+           (appstate-quit app))])))
+
+;; Input/Output
+; fill : Image Number Number Color Color -> Image 
+
+(define (fill i x y c1 c2)
+  (local ((define CXY (get-color i x y)))
+  (cond
+    [(or (> x (image-width i))  ; terminate when:
+         (< x 0)                ; current point is out of bounds, 
+         (> y (image-height i))
+         (< y 0)
+         (color=? c1 CXY)) ; the point is already of the right color.
+     i]
+    [(color=? c2 CXY) ; the color of the current point is the same as the point clicked initially
+     (fill
+      (fill
+       (fill
+        (fill
+         (place-image (square 1 "solid" c1) (+ x 0.5) (+ y 0.5) i) ; color the current point
+         x (- y 1) c1 c2) ; call fill on the point above the current one
+        (+ x 1) y c1 c2) ; call fill on the point to the right of the current one
+       x (+ y 1) c1 c2) ; call fill on the point below the current one
+      (- x 1) y c1 c2)] ; call fill on the point to the left of the current one
+    [else i])))
+
+
+;; Input/Output
+; color=? : Color Color -> Boolean
+; takes two colors and returns #true if they're equal
+; header: (define (color=? c1 c2) #true)
+
+(define (color=? c1 c2)
+  (equal? (circle 1 "solid" c1) (circle 1 "solid" c2)))
+
+; ==================================================================================================
 ; Undo + Render Functions
 
 ; Undo ------------------------------------------------------------------------------
@@ -487,6 +554,11 @@
              [(string=? me "button-up")
               (add-free-to-canvas a)]
              [else a])]
+      ; fill
+      [(string=? type "fill")
+       (cond [(string=? me "button-up")
+              (add-fill a x y)]
+             [else a])]
      ;[(string=? type ...) (...)] -> for the other special tools
       ; tool-type is a figure ---------------------------------------------------------
       [(or (string=? type "line")
@@ -528,13 +600,14 @@
                 [(string=? k "p") (new-type a "ellipse")]
                 [(string=? k "f") (new-type a "free")]
                 [(string=? k "e") (new-type a "eraser")]
+                [(string=? k "i") (new-type a "fill")]
                 [(string=? k "up")
-                 (if (>= SIZE 15)   ; if current tool size is >= 10
+                 (if (>= SIZE 30)   ; if current tool size is >= 30
                      a              ; stop increasing
                      (inc-size a))] ; else, continue
                 [(string=? k "down") ; if current tool size <= 1
                  (if (<= SIZE 1)     ; stop decreasing
-                     a               ; else, continue
+                     a               ; else, continuedrw
                      (dec-size a))]
                 [(string=? k "1") (set-mode-solid a)]   ; change tool mode
                 [(string=? k "2") (set-mode-outline a)] ; current keys are placeholder
