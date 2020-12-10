@@ -1,5 +1,9 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname Figures_and_Rendering) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 (require 2htdp/image)
 (require 2htdp/universe)
+(require 2htdp/batch-io)
 
 ; Start app by using (start-app MAX-W MAX-H BG-COLOR)
 
@@ -818,8 +822,8 @@
           (define C9 (color-icon (ui-c9 (appstate-ui a)))))
   (cond
     [(false? hover) a]
-    ;[(string=? hover "save")
-    ; (save a)]
+    [(equal? hover SAVE)
+     (save a)]
     [(equal? hover UNDO)
      (undo a)]
     [(equal? hover REDO)
@@ -936,6 +940,39 @@
                 (make-posn (- (posn-x XL-POSN) 30) (posn-y XL-POSN))]
                [else (make-posn 0 0)])))
      (rectangle UI-W UI-H "solid" "transparent"))))
+
+; ==================================================================================================
+; Save Function
+
+;; Input/Output
+; save : AppState String -> AppState
+; takes an appstate, saves the current canvas as PNG with the name String and returns the appstate unchanged
+; header: (define (save app) #true)
+
+(define (save app)
+  (make-appstate (appstate-canvas app)                                   
+                 (appstate-pre app)
+                 (appstate-post app)
+                 (appstate-tool app)
+                 (appstate-ui app)
+                 (not                     ; save-image returns a boolean so
+                  (save-image             ; if the image can't be saved it quits the app
+                   (appstate-canvas app)
+                   (string-append         ; name of the saved image 
+                    "img"
+                    (saved-image-number 0)
+                    ".png")))))
+
+;; Input/Output
+; saved-image-number : Number -> String
+; returns the next number (represented as string) not already used for saved images
+; header: (define (saved-image-number 0) "0")
+
+(define (saved-image-number n)
+  (cond
+    [(file-exists? (string-append "img" (number->string n) ".png"))
+     (saved-image-number (add1 n))]
+    [else (number->string n)]))
 
 ; ==================================================================================================
 ; Mouse Handler
@@ -1090,6 +1127,7 @@
            (change-canvas-size a k)]
           [(string=? k "k") (update a "mode" "solid" #false)]   ; change tool mode
           [(string=? k "j") (update a "mode" "outline" #false)] ; current keys are placeholder
+          [(string=? k "a") (save a)]
           [(string=? k "q") (quit-app a)]
           [else a])))
 
