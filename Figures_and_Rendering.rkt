@@ -641,10 +641,16 @@
 (define TOP-PEN (pen "cornflower blue" 5 "solid" "round" "round"))
 
 (define SAVE (overlay
-              (text/font "Save" 30 "cornflower blue"
+              (text/font "Save" 25 "cornflower blue"
                          "Gill Sans" "default" "normal" "bold" #f)
-              (rectangle (- (/ UI-W 2) 5) 50 "outline" TOP-PEN)
-              (rectangle (- (/ UI-W 2) 5) 50 "solid" "white smoke")))
+              (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
+              (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
+
+(define LOAD (overlay
+              (text/font "Load" 25 "cornflower blue"
+                         "Gill Sans" "default" "normal" "bold" #f)
+              (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
+              (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
 
 (define UNDO (overlay/offset
               (rotate 90 (isosceles-triangle 17 77 "solid" "cornflower blue"))
@@ -787,7 +793,8 @@
           (define C7 (color-icon (ui-c7 (appstate-ui a))))
           (define C8 (color-icon (ui-c8 (appstate-ui a))))
           (define C9 (color-icon (ui-c9 (appstate-ui a)))))
-    (list SAVE (make-posn 75 25)
+    (list SAVE (make-posn 40 25)
+          LOAD (make-posn 110 25)
           UNDO (make-posn 185 25)
           REDO (make-posn 260 25)
           C1 (make-posn 45 100)
@@ -888,6 +895,8 @@
     [(false? hover) a]
     [(equal? hover SAVE)
      (save a)]
+    [(equal? hover LOAD)
+     (load a)]
     [(equal? hover UNDO)
      (undo a)]
     [(equal? hover REDO)
