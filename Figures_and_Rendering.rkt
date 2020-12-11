@@ -478,15 +478,12 @@
 ; Fill Tool
 
 ;; Input/Output
-; add-fill-in : AppState Number Number -> AppState
+; fill : AppState -> AppState
 
-(define (add-fill app x y)
-  (local ((define COLOR1 (tool-color (appstate-tool app)))
-          (define COLOR2 (get-color (appstate-canvas app) x y)))
-  (cond
-    [(color=? COLOR1 COLOR2) app]
-    [else (make-appstate
-           (fill (appstate-canvas app) x y COLOR1 COLOR2)
+(define (fill app)
+  (local ((define COLOR (tool-color (appstate-tool app))))
+   (make-appstate 
+           (rectangle MAX-W MAX-H "solid" COLOR)
            (cons (appstate-canvas app)
                  (appstate-pre app))
            '()
@@ -498,40 +495,7 @@
                 #false ; set extra to false
                 #false) ; tool set to not active
            (appstate-ui app)
-           (appstate-quit app))])))
-
-;; Input/Output
-; fill : Image Number Number Color Color -> Image 
-
-(define (fill i x y c1 c2)
-  (local ((define CXY (get-color i x y)))
-  (cond
-    [(or (> x (image-width i))  ; terminate when:
-         (< x 0)                ; current point is out of bounds, 
-         (> y (image-height i))
-         (< y 0)
-         (color=? c1 CXY)) ; the point is already of the right color.
-     i]
-    [(color=? c2 CXY) ; the color of the current point is the same as the point clicked initially
-     (fill
-      (fill
-       (fill
-        (fill
-         (place-image (square 1 "solid" c1) (+ x 0.5) (+ y 0.5) i) ; color the current point
-         x (- y 1) c1 c2) ; call fill on the point above the current one
-        (+ x 1) y c1 c2) ; call fill on the point to the right of the current one
-       x (+ y 1) c1 c2) ; call fill on the point below the current one
-      (- x 1) y c1 c2)] ; call fill on the point to the left of the current one
-    [else i])))
-
-
-;; Input/Output
-; color=? : Color Color -> Boolean
-; takes two colors and returns #true if they're equal
-; header: (define (color=? c1 c2) #true)
-
-(define (color=? c1 c2)
-  (equal? (circle 1 "solid" c1) (circle 1 "solid" c2)))
+           (appstate-quit app))))
 
 ; ==================================================================================================
 ; Undo + Render Functions
@@ -966,7 +930,7 @@
 ;; Input/Output
 ; saved-image-number : Number -> String
 ; returns the next number (represented as string) not already used for saved images
-; header: (define (saved-image-number 0) "0")
+; header: (define (saved-image-number 0) "0")(start-app MAX-W MAX-H BG-COLOR)
 
 (define (saved-image-number n)
   (cond
@@ -1056,8 +1020,8 @@
                 [else a])]
          ; fill
          [(string=? type "fill")
-          (cond [(string=? me "button-up")
-                 (add-fill a x y)]
+          (cond [(string=? me "button-down")
+                 (fill a)]
                 [else a])]
          ; tool-type is a figure ---------------------------------------------------------
          [(or (string=? type "line")
