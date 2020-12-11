@@ -1039,22 +1039,6 @@
     [else (number->string n)]))
 
 ; ==================================================================================================
-; Load Function
-
-;; Input/Output
-; save : Image -> AppState
-; takes an image, loads a PNG image to the current canvas and returns the appstate with the loaded image.
-; header: (define (load app) #true)
-
-(define (load app)
-  (make-appstate (bitmap/file "img0.png")                                   
-                 (appstate-pre app)
-                 (appstate-post app)
-                 (appstate-tool app)
-                 (appstate-ui app)
-                 #false))
-
-; ==================================================================================================
 ; Mouse Handler
 
 ;; Input/output
@@ -1208,7 +1192,6 @@
           [(string=? k "k") (update a "mode" "solid" #false)]   ; change tool mode
           [(string=? k "j") (update a "mode" "outline" #false)] ; current keys are placeholder
           [(string=? k "a") (save a)]
-          [(string=? k "d") (load a)]
           [(string=? k "q") (quit-app a)]
           [else a])))
 
