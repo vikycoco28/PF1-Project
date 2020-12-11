@@ -1,3 +1,6 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname Figures_and_Rendering) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 (require 2htdp/image)
 (require 2htdp/universe)
 (require 2htdp/batch-io)
@@ -923,10 +926,16 @@
 (define TOP-PEN (pen "cornflower blue" 5 "solid" "round" "round"))
 
 (define SAVE (overlay
-              (text/font "Save" 30 "cornflower blue"
+              (text/font "Save" 25 "cornflower blue"
                          "Gill Sans" "default" "normal" "bold" #f)
-              (rectangle (- (/ UI-W 2) 5) 50 "outline" TOP-PEN)
-              (rectangle (- (/ UI-W 2) 5) 50 "solid" "white smoke")))
+              (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
+              (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
+
+(define LOAD (overlay
+              (text/font "Load" 25 "cornflower blue"
+                         "Gill Sans" "default" "normal" "bold" #f)
+              (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
+              (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
 
 (define UNDO (overlay/offset
               (rotate 90 (isosceles-triangle 17 77 "solid" "cornflower blue"))
@@ -1056,7 +1065,7 @@
             48 20 48 48 ;3rd line pos
             (pen "chocolate" 8 "solid" "round" "round"))))
 
-; Getting information to draw on UI -----------------------------------------------
+; Getting information to draw on UI -----389357de7e4164ad8725893d9fa69a3ac283abfa------------------------------------------
 
 ; make-loic : AppState -> List<Any>
 ; returns a list of all icons present, using the given
@@ -1072,7 +1081,8 @@
           (define C7 (color-icon (ui-c7 (appstate-ui a))))
           (define C8 (color-icon (ui-c8 (appstate-ui a))))
           (define C9 (color-icon (ui-c9 (appstate-ui a)))))
-    (list SAVE (make-posn 75 25)
+    (list SAVE (make-posn 40 25)
+          LOAD (make-posn 110 25)
           UNDO (make-posn 185 25)
           REDO (make-posn 260 25)
           C1 (make-posn 45 100)
@@ -1124,7 +1134,7 @@
 ; return the location (centered) of the icon as a posn
 
 ; Examples
-(check-expect (get-icon-posn SAVE) (make-posn 75 25))
+(check-expect (get-icon-posn SAVE) (make-posn 40 25))
 
 (check-expect (get-icon-posn FILL) (make-posn 210 800))
 
@@ -1241,6 +1251,8 @@
     [(false? hover) a]
     [(equal? hover SAVE)
      (save a)]
+    [(equal? hover LOAD)
+     (load a)]
     [(equal? hover UNDO)
      (undo a)]
     [(equal? hover REDO)
@@ -1313,6 +1325,7 @@
 (define (str->icon s)
   (cond
     [(string=? s "save") SAVE]
+    [(string=? s "load") LOAD]
     [(string=? s "undo") UNDO]
     [(string=? s "redo") REDO]
     [(string=? s "free") FREE-ICON]
@@ -1401,9 +1414,9 @@
 ; Save Function
 
 ;; Input/Output
-; save : AppState String -> AppState
+; save : AppState -> AppState
 ; takes an appstate, saves the current canvas as PNG with the name String and returns the appstate unchanged
-; header: (define (save app) #true)
+; header: (define (save app) #true) 
 
 (define (save app)
   (make-appstate (appstate-canvas app)                                   
@@ -1431,6 +1444,33 @@
     [else (number->string n)]))
 
 ; ==================================================================================================
+; Load Function
+
+;; Input/Output
+; load : Image -> AppState
+; takes an image, loads a PNG image to the current canvas and returns the appstate with the loaded image.
+; header: (define (load app) #true)
+
+(define (load app)
+  (make-appstate (bitmap/file (string-append "img" (loaded-image-number 0 1) ".png"))                                   
+                 (appstate-pre app)
+                 (appstate-post app)
+                 (appstate-tool app)
+                 (appstate-ui app)
+                 #false))
+
+;; Input/Output
+; loaded-image-number : Number -> String
+; returns the last (represented as string) image
+; header: (define (loaded-image-number 0 1) )
+
+(define (loaded-image-number m o)
+  (cond
+    [(file-exists? (string-append "img" (number->string o) ".png"))
+     (loaded-image-number (add1 m) (add1 o))]
+    [else (number->string m)]))
+
+; ==================================================================================================
 ; Mouse Handler
 
 ;; Input/output
@@ -1445,7 +1485,7 @@
           (define post (appstate-post a))
           (define ui (appstate-ui a))
           (define hover (ui-hover ui))
-          ; tool values
+          ; tool values389357de7e4164ad8725893d9fa69a3ac283abfa
           (define type (tool-type (appstate-tool a)))
           (define size (tool-size (appstate-tool a)))
           (define color (tool-color (appstate-tool a)))
@@ -1584,6 +1624,7 @@
           [(string=? k "k") (update a "mode" "solid" #false)]   ; change tool mode
           [(string=? k "j") (update a "mode" "outline" #false)] ; current keys are placeholder
           [(string=? k "a") (save a)]
+          [(string=? k "d") (load a)]
           [(string=? k "q") (quit-app a)]
           [else a])))
 
