@@ -926,13 +926,13 @@
 (define TOP-PEN (pen "cornflower blue" 5 "solid" "round" "round"))
 
 (define SAVE (overlay
-              (text/font "Save" 25 "cornflower blue"
+              (text/font "Save" 22 "cornflower blue"
                          "Gill Sans" "default" "normal" "bold" #f)
               (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
               (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
 
 (define LOAD (overlay
-              (text/font "Load" 25 "cornflower blue"
+              (text/font "Load" 22 "cornflower blue"
                          "Gill Sans" "default" "normal" "bold" #f)
               (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
               (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
@@ -1134,6 +1134,7 @@
 ; return the location (centered) of the icon as a posn
 
 ; Examples
+
 (check-expect (get-icon-posn SAVE) (make-posn 40 25))
 
 (check-expect (get-icon-posn FILL) (make-posn 210 800))
@@ -1159,7 +1160,7 @@
 ; return the tool/option icon the mouse is currently hovering on the UI
 
 ; Examples
-(check-expect (get-hover 5 5) SAVE)
+(check-expect (get-hover 10 10) SAVE)
 
 (check-expect (get-hover 260 340) XL)
 
@@ -1338,15 +1339,15 @@
     [(string=? s "outline") OUTLINE-ICON]
     [(string=? s "eraser") ERASER]
     [(string=? s "fill") FILL]
-    [(string=? s "c1") (list-ref LOI 3)]
-    [(string=? s "c2") (list-ref LOI 4)]
-    [(string=? s "c3") (list-ref LOI 5)]
-    [(string=? s "c4") (list-ref LOI 6)]
-    [(string=? s "c5") (list-ref LOI 7)]
-    [(string=? s "c6") (list-ref LOI 8)]
-    [(string=? s "c7") (list-ref LOI 9)]
-    [(string=? s "c8") (list-ref LOI 10)]
-    [(string=? s "c9") (list-ref LOI 11)]
+    [(string=? s "c1") (list-ref LOI 2)]
+    [(string=? s "c2") (list-ref LOI 3)]
+    [(string=? s "c3") (list-ref LOI 4)]
+    [(string=? s "c4") (list-ref LOI 5)]
+    [(string=? s "c5") (list-ref LOI 6)]
+    [(string=? s "c6") (list-ref LOI 7)]
+    [(string=? s "c7") (list-ref LOI 8)]
+    [(string=? s "c8") (list-ref LOI 11)]
+    [(string=? s "c9") (list-ref LOI 12)]
     [else #false]))
 
 ; draw-selected-ui : AppState -> Image
@@ -1362,10 +1363,10 @@
                      (rotate 270 (triangle 30 "solid" "light red"))
                      (rotate 270 (triangle 30 "solid" "light red")))
                (list
-                (make-posn 170 650)
-                (make-posn 135 220)
-                (make-posn 30 310)
-                (make-posn 225 95))
+                (make-posn 170 650) ; type
+                (make-posn 135 220) ; color
+                (make-posn 30 310)  ; mode
+                (make-posn 225 95)) ; size
                (rectangle UI-W UI-H "solid" "transparent")))
 
 ; Code
