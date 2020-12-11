@@ -1,6 +1,3 @@
-;; The first three lines of this file were inserted by DrRacket. They record metadata
-;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname Figures_and_Rendering) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 (require 2htdp/image)
 (require 2htdp/universe)
 (require 2htdp/batch-io)
@@ -10,23 +7,25 @@
 ; Constants
 (define MAX-W 1800)
 (define MAX-H 1000)
-(define BG-COLOR "gainsboro")
-(define EMPTY-CANVAS (rectangle 1800 1000 "solid" "white"))
+(define BG-COLOR "white")
+(define EMPTY-CANVAS (rectangle MAX-W MAX-H "solid" BG-COLOR))
 
 ;; Data types
 
 ; a Tool is a structure (make-tool type size color mode x1 y1 x2 y2 status)
 ; where type : String
+;       the tool type (freehand, line, etc)
 ;       size : Number
-;       color : Color 
-;       mode : String
-;              represents the mode for the figures ("outline" or "solid")        
+;       color : String
+;       a color from Racket's Color Database
+;       mode : String or Number
+;       represents the mode for the figures ("outline" or "solid")
 ;       x1, y1, x2, y2 : Number
-;                        represent the coordinates of the current figure/tool
+;       represent the coordinates of the current figure/tool
 ;       extra: Any
-;              optional field used to store temporary values (eg: a list for freehand tool), otherwise it's set to #false
+;       optional field used to store temporary values (eg: a list for freehand tool), otherwise it's set to #false
 ;       status : Boolean
-;                represents if the tool is active
+;       represents if the tool is active
 (define-struct tool [type size color mode x1 y1 x2 y2 extra status])
 
 ; a List<Image> is one of:
@@ -34,33 +33,94 @@
 ; - (cons Image List<Image>)
 ; interpretation: a list of canvases
 
-; a UI is a Structure (make-ui hover click c1 c2 c3 c4 c5 c6 c7 c8 c9)
-; where hover, click: String
-;       tool/option being hovered/clicked by mouse (if any, otherwise they're set to #false)
-;       sel : Structure (make-color) or String
-;       saves a selected color in case a tool (eg eraser) is selected
-;       c1, c2, c3, c4, c5, ... : Structure (make-color) or String
-;       they represent a palette of 9 colors the user has saved
-(define-struct ui [hover click sel c1 c2 c3 c4 c5 c6 c7 c8 c9])
+; a UI is a Structure (make-ui hover c1 c2 c3 c4 c5 c6 c7 c8 c9)
+; where hover: Image
+;       UI tool/option being hovered by mouse (if any, otherwise they're set to #false)
+;       sel : String
+;       holds latest selected palette color (useful for handling the eraser)
+;       c1, c2, c3, c4, c5, c6, c7, c8, c9: Structure (make-color red green blue alpha)
+;       they represent a palette of 9 predetermined colors
+(define-struct ui [hover sel c1 c2 c3 c4 c5 c6 c7 c8 c9])
 
 ; Data Examples
-(define START-UI (make-ui #false #false "c9" "lightcoral" "sandy brown" "gold" "aquamarine" "royal blue" "medium orchid" "pink" "white" "black"))
+(define START-UI (make-ui #false "c9" "lightcoral" "sandy brown" "gold" "aquamarine" "royal blue" "medium orchid" "pink" "white" "black"))
 
-; an AppState is a structure (make-appstate canvas pre post tool quit)
+(define UI1 (make-ui #false "c1" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black"))
+
+(define UI2 (make-ui #false "c1" "brown" "purple" "gray" "light blue" "light green" "light red" "black" "white" "blue"))
+
+; an AppState is a Structure (make-appstate canvas pre post tool ui quit)
 ; where canvas : Image
+;       a drawing canvas with the latest changes
 ;       pre, post : List<Image>
+;       changes done/undone to the canvas
 ;       tool : Tool
+;       the current tool and its corresponding values (size, color, etc)
+;       ui: Structure
+;       information to be displayed on the ui (selected options, color palette, etc)
 ;       quit : Boolean
+;       whether the app has quit or not
 ; interpretation: it represents the current state of the app
 (define-struct appstate [canvas pre post tool ui quit])
 
 ; Examples of data
+; A base AppState should have both pre and post as empty lists, and tool set with standard values like in IS
 (define IS
   (make-appstate
    EMPTY-CANVAS
    '()
    '()
    (make-tool "free" 1 (ui-c9 START-UI) "outline" 0 0 0 0 #false #false)
+   START-UI
+   #false))
+
+(define IS0
+  (make-appstate
+   (rectangle 900 900 "solid" "white")
+   '()
+   '()
+   (make-tool "free" 1 (ui-c9 UI1) "outline" 0 0 0 0 #false #false)
+   UI1
+   #false))
+
+(define IS1
+  (make-appstate
+   (rectangle 1200 700 "solid" "gray")
+   '()
+   '()
+   (make-tool "line" 8 (ui-c1 UI2) "solid" 5 10 90 100 #false #true)
+   UI2
+   #false))
+
+(define IS2
+  (make-appstate
+   (rectangle 250 90 "solid" "light gray")
+   '()
+   '()
+   (make-tool "line" 30 (ui-c9 UI2) "solid" 65 80 200 5 #false #false)
+   UI2
+   #false))
+
+; AppState used for testing freehand
+(define ISF
+  (make-appstate
+   (rectangle 900 900 "solid" "white")
+   '()
+   '()
+   (make-tool "free" 8 "black" "solid"
+              90 100 95 105
+              (list (make-posn 90 100) (make-posn 85 95))
+              #true)
+   START-UI
+   #true))
+
+; AppState for testing undo/redo
+(define ISUR
+  (make-appstate
+   (rectangle 500 500 "solid" "orange")
+   (list (rectangle 500 500 "solid" "red"))
+   (list (rectangle 500 500 "solid" "green"))
+   (make-tool "free" 8 "black" "solid" 0 0 0 0 #false #false)
    START-UI
    #false))
 
@@ -82,6 +142,36 @@
                START-UI
                #false))
 
+; Note: Changing tool color has to be done by updating "sel" in ui, not by updating "color" directly
+(check-expect (update IS "sel" "c5" #false)
+              (make-appstate
+               EMPTY-CANVAS
+               '()
+               '()
+               (make-tool "free" 1 "royal blue" "outline" 0 0 0 0 #false #false)
+               (make-ui #false "c5" "lightcoral" "sandy brown" "gold" "aquamarine" "royal blue" "medium orchid" "pink" "white" "black")
+               #false))
+
+(check-expect (update IS0 "hover" UNDO #false)
+              (make-appstate
+               (rectangle 900 900 "solid" "white")
+               '()
+               '()
+               (make-tool "free" 1 (ui-c9 UI1) "outline" 0 0 0 0 #false #false)
+               (make-ui UNDO "c1" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black")
+               #false))
+
+; Status cannot be changed via update, so the resulting appstate doesn't change
+(check-expect (update IS0 "status" #true #false)
+              (make-appstate
+               (rectangle 900 900 "solid" "white")
+               '()
+               '()
+               (make-tool "free" 1 (ui-c9 UI1) "outline" 0 0 0 0 #false #false)
+               UI1
+               #false))
+
+; Code
 (define (update a field new-value mod)
   (local (; local values for better readability -----------------
           ; appstate values
@@ -129,7 +219,6 @@
        ; Updating UI Values
        (make-ui
         (if (string=? field "hover") new-value (ui-hover UI)) ; changing ui option mouse is hovering (if any)
-        (if (string=? field "click") new-value (ui-hover UI)) ; changing ui option mouse is clicking (if any)
         (if (string=? field "sel") new-value (ui-sel UI))   ; setting selected color (used for eraser)
         C1 C2 C3 C4 C5 C6 C7 C8 C9)
        (appstate-quit a))))
@@ -147,12 +236,12 @@
 (check-expect (get-color (square 1 "solid" "green") 0 0)
               (make-color 0 255 0))
 
-;; Code
+; Code
 (define (get-color i x y)
   (first (image->color-list
           (crop x y 1 1 i))))
 
-;; Input/Output
+;; Iput/Output
 ; get-color-canvas : AppState -> Color
 ; takes an appstate and returns the initial color of the canvas
 ; header: (define (get-color-canvas app) "red")
@@ -183,31 +272,82 @@
 ; change-canvas-size a k : AppState KeyEvent -> Image
 ; enlarges/reduces current canvas depending on arrow keys
 ; (define (change-canvas-size a k) EMPTY-CANVAS)
+
+; Examples
+; IS has canvas size at its maximum, so nothing changes
+(check-expect (change-canvas-size IS "right")
+              (make-appstate
+               EMPTY-CANVAS
+               '()
+               '()
+               (make-tool "free" 1 (ui-c9 START-UI) "outline" 0 0 0 0 #false #false)
+               START-UI
+               #false))
+
+(check-expect (change-canvas-size IS0 "right")
+              (make-appstate
+               (overlay/align "left" "middle"
+                              (rectangle 900 900 "solid" "white")
+                              (rectangle 950 900 "solid" "white"))
+               (cons (appstate-canvas IS0) '())
+               '()
+               (make-tool "free" 1 (ui-c9 UI1) "outline" 0 0 0 0 #false #false)
+               UI1
+               #false))
+
+(check-expect (change-canvas-size IS1 "up")
+              (make-appstate
+               (crop 0 0 1200 650 (appstate-canvas IS1))
+               (cons (appstate-canvas IS1) '())
+               '()
+               (appstate-tool IS1)
+               UI2
+               #false))
+
+; IS2's canvas is already at a minimum, so it isn't reduced
+(check-expect (change-canvas-size IS2 "left")
+              (make-appstate
+               (rectangle (- UI-W 50) 90 "solid" "light gray")
+               '()
+               '()
+               (make-tool "line" 30 (ui-c9 UI2) "solid" 65 80 200 5 #false #false)
+               UI2
+               #false))
+
+; Code
 (define (change-canvas-size a k)
   (local ((define WIDTH (image-width (appstate-canvas a)))
-          (define HEIGHT (image-height (appstate-canvas a))))
-          ;(define COLOR (the bg color of the initial canvas)))
+          (define HEIGHT (image-height (appstate-canvas a)))
+          (define RIGHT (and (string=? k "right") ; check width isnt at its maximum
+                             (< WIDTH MAX-W)))
+          (define DOWN (and (string=? k "down")  ; check height isnt at its maximum
+                            (< HEIGHT MAX-H)))
+          (define LEFT (and (string=? k "left")
+                            (< UI-W WIDTH))) ; check width isnt at its minimum
+          (define UP (and (string=? k "up")
+                          (< 100 HEIGHT)))) ; check height isnt at its minimum
     (make-appstate
-       (cond [(and (string=? k "right") ; check width isnt at its maximum
-                   (<= WIDTH MAX-W))
+       (cond [RIGHT
               (overlay/align "left" "middle"
                              (appstate-canvas a)
                              (rectangle (+ WIDTH 50) HEIGHT
                                         "solid" (get-color (appstate-canvas a) 0 0)))]
-             [(and (string=? k "down")  ; check height isnt at its maximum
-                   (<= HEIGHT MAX-H))
+             [DOWN
               (overlay/align "middle" "top"
                              (appstate-canvas a)
                              (rectangle WIDTH (+ HEIGHT 50)
                                         "solid" (get-color (appstate-canvas a) 0 0)))]
-             [(and (string=? k "left")
-                   (<= UI-W WIDTH)) ; check width isnt at its minimum
+             [LEFT
               (crop 0 0 (- WIDTH 50) HEIGHT (appstate-canvas a))]
-             [(and (string=? k "up")
-                   (<= 100 HEIGHT)) ; check height isnt at its minimum
+             [UP
               (crop 0 0 WIDTH (- HEIGHT 50) (appstate-canvas a))]
              [else (appstate-canvas a)])
-       (cons (appstate-canvas a) (appstate-pre a))
+       (if (or RIGHT ; if the canvas
+               DOWN  ; was increased
+               LEFT ; or decreased
+               UP)
+           (cons (appstate-canvas a) (appstate-pre a)) ; cons canvas to pre
+           (appstate-pre a)) ; else, leave pre as is
        '()
        (appstate-tool a)
        (appstate-ui a)
@@ -222,7 +362,7 @@
 (define (render app)
   (local ((define TYPE (tool-type (appstate-tool app))))
     (place-images
-     (list ;(draw-selected-ui app) ;[!] uncomment to render select pointer (slow)
+     (list (draw-selected-ui app)
            UI-BASE
            (cond [(tool-status (appstate-tool app)) ; tool is active
             (cond [(string=? TYPE "free") (draw-free app)]
@@ -234,7 +374,7 @@
                   [(string=? TYPE "ellipse") (draw-figure app)]
                   [else (appstate-canvas app)])]
             [else (appstate-canvas app)]))
-     (list ;(make-posn (/ UI-W 2) (/ UI-H 2))  ;[!] uncomment to render select pointer (slow)
+     (list (make-posn (/ UI-W 2) (/ UI-H 2))
            (make-posn (/ UI-W 2) (/ UI-H 2))
            (make-posn (/ (image-width (appstate-canvas app)) 2)
                       (/ (image-height (appstate-canvas app)) 2)))
@@ -245,8 +385,22 @@
 
 ; draw-line: AppState Number Number -> Image
 ; add current line to canvas
-;(define (draw-line a x y) EMPTY-CANVAS)
+; (define (draw-line a x y) EMPTY-CANVAS)
 
+; Examples
+(check-expect (draw-line IS1)
+              (add-line
+               (rectangle 1200 700 "solid" "gray")
+               5 10 90 100
+               (pen "brown" 8 "solid" "round" "round")))
+
+(check-expect (draw-line IS2)
+              (add-line
+               (rectangle 250 90 "solid" "light gray")
+               65 80 200 5
+               (pen "blue" 30 "solid" "round" "round")))
+
+; Code
 (define (draw-line a)
   (local ((define X1 (tool-x1 (appstate-tool a)))
           (define Y1 (tool-y1 (appstate-tool a)))
@@ -265,6 +419,49 @@
 ; move-end-free a x y : AppState Number Number -> AppState
 ; updates tool's endpoints and temporarily replaces the "extra" 
 ; field with a list of coordinates (stored as posn)
+
+; Examples
+(check-expect (move-end-free ISF 100 110)
+              (make-appstate
+               (rectangle 900 900 "solid" "white")
+               '()
+               '()
+               (make-tool
+                "free" 8 "black" "solid"
+                90 100 100 110
+                (list (make-posn 100 110) (make-posn 90 100) (make-posn 85 95))
+                #true)
+               START-UI
+               #false))
+
+; case where a new point isnt added to list of points stored in extra
+(check-expect (move-end-free ISF 93 103)
+              (make-appstate
+               (rectangle 900 900 "solid" "white")
+               '()
+               '()
+               (make-tool
+                "free" 8 "black" "solid"
+                90 100 93 103
+                (list (make-posn 90 100) (make-posn 85 95)) ; new x and y are close, so dont add them to list
+                #true)
+               START-UI
+               #false))
+
+(check-expect (move-end-free ISF 150 120)
+              (make-appstate
+               (rectangle 900 900 "solid" "white")
+               '()
+               '()
+               (make-tool
+                "free" 8 "black" "solid"
+                90 100 150 120
+                (list (make-posn 150 120) (make-posn 90 100) (make-posn 85 95))
+                #true)
+               START-UI
+               #false))
+
+; Code
 (define (move-end-free a x y)
   (local (; tool values for readability
           (define X1 (tool-x1 (appstate-tool a)))
@@ -300,7 +497,18 @@
 ; draw-free: AppState -> Image
 ; get the values of the list<posn> stored in "extra" field
 ; and draw them by treating them as line coordinates
-; (define (draw-free a) EMPTY-CANVAS)
+
+; Examples
+(check-expect (draw-free ISF)
+              (add-line
+               (place-image
+                (circle 4 "solid" "black")
+                85 95
+                (appstate-canvas ISF))
+               85 95 90 100
+               (pen "black" 8 "solid" "round" "round")))
+
+; Code
 (define (draw-free a)
   (local ((define LOP (tool-extra (appstate-tool a)))
           (define COLOR (tool-color (appstate-tool a)))
@@ -320,7 +528,27 @@
 
 ; add-free-to-canvas: AppState -> AppState
 ; update appstate with freehand line drawn on the canvas
-; (define (add-free-to-canvas a) a)
+
+; Examples
+(check-expect (add-free-to-canvas ISF)
+              (make-appstate
+               (add-line                                 ; the new
+                (place-image                             ; canvas is
+                 (circle 4 "solid" "black")              ; created
+                 85 95                                   ; by using
+                 (appstate-canvas ISF))                  ; draw-free
+                85 95 90 100                             ; like
+                (pen "black" 8 "solid" "round" "round")) ; above
+               (cons (rectangle 900 900 "solid" "white") '())
+               '()
+               (make-tool "free" 8 "black" "solid"
+                          0 0 0 0
+                          #false  ; set extra to #false
+                          #false) ; set tool to not active
+               START-UI
+               #true))
+
+; Code
 (define (add-free-to-canvas a)
   (local ((define TYPE (tool-type (appstate-tool a)))
           (define SEL (ui-sel (appstate-ui a))) 
@@ -375,6 +603,7 @@
                 START-UI
                 #false))
                (place-image (square 20 "outline" "black") 10 10 EMPTY-CANVAS))
+
 (check-expect (draw-figure
                (make-appstate
                 EMPTY-CANVAS
@@ -438,10 +667,11 @@
 (check-expect (figure-height
                (make-tool "circle" 1 (ui-c9 START-UI) "outline" 0 0 20 30 #false #false))
               20)
+
 (check-expect (figure-height
                (make-tool "rectangle" 1 (ui-c9 START-UI) "outline" 0 0 20 30 #false #false))
               30)
-               
+
 ;: Code
 (define (figure-height t)
   (local ((define X1 (tool-x1 t))
@@ -505,7 +735,7 @@
                 '()
                 (make-tool "square" 1 (ui-c9 START-UI) "outline" 0 0 0 0 #false #false)
                 START-UI
-                #false))       
+                #false)) 
 
 ;; Code
 (define (add-figure-to-canvas app)
@@ -552,7 +782,7 @@
                 '()
                 (make-tool "square" 1 (ui-c9 START-UI) "outline" 0 0 50 80 #false #false)
                 START-UI
-                #false))   
+                #false))  
 
 ;; Code
 (define (move-end app new-x new-y)
@@ -576,7 +806,6 @@
 ; ==================================================================================================
 ; Fill Tool
 
-;; Input/Output
 ; fill : AppState -> AppState
 ; it takes an appstate and returns the appstate with the canvas filled with the selected color
 
@@ -595,31 +824,50 @@
                 '()
                 (make-tool "square" 1 "blue" "outline" 0 0 0 0 #false #false)
                 START-UI
-                #false))   
+                #false))
 
-;; Code
+; Code
 (define (fill app)
   (local ((define COLOR (tool-color (appstate-tool app))))
-   (make-appstate 
-           (rectangle MAX-W MAX-H "solid" COLOR)
-           (cons (appstate-canvas app)
-                 (appstate-pre app))
-           '()
-           (make-tool (tool-type (appstate-tool app))
-                (tool-size (appstate-tool app))
-                (tool-color (appstate-tool app))
-                (tool-mode (appstate-tool app))
-                0 0 0 0 ; x1,y1,x2,y2 set to 0
-                #false ; set extra to false
-                #false) ; tool set to not active
-           (appstate-ui app)
-           (appstate-quit app))))
+    (make-appstate 
+     (rectangle (image-width (appstate-canvas app))
+                (image-height (appstate-canvas app))
+                "solid" COLOR)
+     (cons (appstate-canvas app)
+           (appstate-pre app))
+     '()
+     (make-tool
+      (tool-type (appstate-tool app))
+      (tool-size (appstate-tool app))
+      (tool-color (appstate-tool app))
+      (tool-mode (appstate-tool app))
+      0 0 0 0 ; x1,y1,x2,y2 set to 0
+      #false ; set extra to false
+      #false) ; tool set to not active
+     (appstate-ui app)
+     (appstate-quit app))))
 
 ; ==================================================================================================
 ; Undo + Render Functions
 
-; Undo ------------------------------------------------------------------------------
+; undo : AppState -> AppState
+; undoes the last action made to the canvas
+; ie, sets the first element of pre to be the new canvas and adjusts pre,post accordingly
 
+; Examples
+(check-expect (undo ISUR)
+              (make-appstate
+               (rectangle 500 500 "solid" "red")
+               '()
+               (list (rectangle 500 500 "solid" "orange")
+                     (rectangle 500 500 "solid" "green"))
+               (appstate-tool ISUR)
+               START-UI
+               #false))
+
+(check-expect (undo IS) IS) ; IS has both pre,post empty
+
+; Code
 (define (undo a)
   (cond [(empty? (appstate-pre a)) a]
         [else
@@ -632,8 +880,24 @@
           (appstate-ui a)
           #false)]))
 
-; Redo ------------------------------------------------------------------------------
+; redo : AppState -> AppState
+; restores a change made to the canvas that was undone
+; ie, sets the first element of post to be the new canvas, and adjusts pre, post accordingly
 
+; Examples
+(check-expect (redo ISUR)
+              (make-appstate
+               (rectangle 500 500 "solid" "green")
+               (list (rectangle 500 500 "solid" "orange")
+                     (rectangle 500 500 "solid" "red"))
+               '()
+               (appstate-tool ISUR)
+               START-UI
+               #false))
+
+(check-expect (redo IS) IS) ; IS has both pre,post empty
+
+; Code
 (define (redo a)
   (cond [(empty? (appstate-post a)) a]
         [else
@@ -659,16 +923,10 @@
 (define TOP-PEN (pen "cornflower blue" 5 "solid" "round" "round"))
 
 (define SAVE (overlay
-              (text/font "Save" 25 "cornflower blue"
+              (text/font "Save" 30 "cornflower blue"
                          "Gill Sans" "default" "normal" "bold" #f)
-              (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
-              (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
-
-(define LOAD (overlay
-              (text/font "Load" 25 "cornflower blue"
-                         "Gill Sans" "default" "normal" "bold" #f)
-              (rectangle (- (/ UI-W 4) 5) 50 "outline" TOP-PEN)
-              (rectangle (- (/ UI-W 4) 5) 50 "solid" "white smoke")))
+              (rectangle (- (/ UI-W 2) 5) 50 "outline" TOP-PEN)
+              (rectangle (- (/ UI-W 2) 5) 50 "solid" "white smoke")))
 
 (define UNDO (overlay/offset
               (rotate 90 (isosceles-triangle 17 77 "solid" "cornflower blue"))
@@ -800,7 +1058,10 @@
 
 ; Getting information to draw on UI -----------------------------------------------
 
-; List of icons + their position
+; make-loic : AppState -> List<Any>
+; returns a list of all icons present, using the given
+; appstate to compute the palette icons with their corresponding color
+
 (define (make-loic a)
   (local ((define C1 (color-icon (ui-c1 (appstate-ui a))))
           (define C2 (color-icon (ui-c2 (appstate-ui a))))
@@ -811,8 +1072,7 @@
           (define C7 (color-icon (ui-c7 (appstate-ui a))))
           (define C8 (color-icon (ui-c8 (appstate-ui a))))
           (define C9 (color-icon (ui-c9 (appstate-ui a)))))
-    (list SAVE (make-posn 40 25)
-          LOAD (make-posn 110 25)
+    (list SAVE (make-posn 75 25)
           UNDO (make-posn 185 25)
           REDO (make-posn 260 25)
           C1 (make-posn 45 100)
@@ -838,16 +1098,16 @@
           LINE-ICON (make-posn 100 650)
           FREE-ICON (make-posn 200 650)
           ERASER (make-posn 90 800)
-          FILL (make-posn 210 800)
-          )))
+          FILL (make-posn 210 800))))
     
+; List of Icons + their corresponding posn
 (define LOIC (make-loic IS))
 
-; List of Icons
+; List of only Icons
 (define LOI
   (filter image? LOIC)) ; tip: type LOI in interactions area to see all icons
 
-; List of Coordinates
+; List of only Coordinates
 (define LOC
   (filter posn? LOIC))
 
@@ -855,14 +1115,22 @@
 (define UI-BASE
   (place-images
    LOI
-   LOC  
+   LOC
    UI-BG))
 
 ; Getting info from the UI -------------------------------------------------------------------
 
 ; Image -> Posn
 ; return the location (centered) of the icon as a posn
-; (define (get-icon-posn icon loi loc) '())
+
+; Examples
+(check-expect (get-icon-posn SAVE) (make-posn 75 25))
+
+(check-expect (get-icon-posn FILL) (make-posn 210 800))
+
+(check-expect (get-icon-posn SOLID-ICON) (make-posn 155 310))
+
+; Code
 (define (get-icon-posn icon)
   (local (; get-posn : Image List<Image> List<Posn> -> Posn
           ; find image coordinates in list
@@ -879,7 +1147,21 @@
 
 ; get-hover : AppState Integer Integer -> Image
 ; return the tool/option icon the mouse is currently hovering on the UI
-; (define (get-hover a x y) #false)
+
+; Examples
+(check-expect (get-hover 5 5) SAVE)
+
+(check-expect (get-hover 260 340) XL)
+
+(check-expect (get-hover 800 25) #false) ; x value outside UI area
+
+(check-expect (get-hover 85 810) ERASER)
+
+(check-expect (get-hover 195 445) RECTANGLE-ICON)
+
+(check-expect (get-hover 95 455) SQUARE-ICON)
+
+; Code
 (define (get-hover x y)
   (local ((define (X1 i) (- (posn-x (get-icon-posn i)) (/ (image-width i) 2))) ; left-hand side
           (define (X2 i) (+ (posn-x (get-icon-posn i)) (/ (image-width i) 2))) ; right-hand side
@@ -898,8 +1180,53 @@
   
 ; select-from-ui : AppState Image -> AppState
 ; updates the appstate according to selection in UI (button-down where the mouse is hovering)
-; (define (select-from-ui a hover) a)
-(define (select-from-ui a hover)
+
+; Examples
+
+(check-expect (select-from-ui
+               (make-appstate
+                EMPTY-CANVAS
+                '() '()
+                (make-tool "free" 30 "black" "solid" 0 0 0 0 #false #false)
+                (make-ui XS "c9" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black")
+                #false))
+              (make-appstate ; FILL is a valid hover option, so tool type is set to fill
+                EMPTY-CANVAS
+                '() '()
+                (make-tool "free" 1 "black" "solid" 0 0 0 0 #false #false)
+                (make-ui XS "c9" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black")
+                #false))
+
+(check-expect (select-from-ui
+               (make-appstate
+                EMPTY-CANVAS
+                '() '()
+                (make-tool "free" 30 "black" "solid" 0 0 0 0 #false #false)
+                (make-ui CIRCLE-ICON "c9" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black")
+                #false))
+              (make-appstate ; hover is circle, so set tool to circle
+                EMPTY-CANVAS
+                '() '()
+                (make-tool "circle" 30 "black" "solid" 0 0 0 0 #false #false)
+                (make-ui CIRCLE-ICON "c9" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black")
+                #false))
+
+(check-expect (select-from-ui
+               (make-appstate
+                EMPTY-CANVAS
+                '() '()
+                (make-tool "free" 1 "black" "solid" 0 0 0 0 #false #false)
+                (make-ui #false "c9" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black") ; hover is #false
+                #false))
+              (make-appstate ; hover is #false, so return the appstate unchanged
+                EMPTY-CANVAS
+                '() '()
+                (make-tool "free" 1 "black" "solid" 0 0 0 0 #false #false)
+                (make-ui #false "c9" "red" "orange" "yellow" "green" "blue" "violet" "pink" "white" "black") ; hover is #false
+                #false))
+
+; Code
+(define (select-from-ui a)
   (local ((define C1 (color-icon (ui-c1 (appstate-ui a))))
           (define C2 (color-icon (ui-c2 (appstate-ui a))))
           (define C3 (color-icon (ui-c3 (appstate-ui a))))
@@ -908,13 +1235,12 @@
           (define C6 (color-icon (ui-c6 (appstate-ui a))))
           (define C7 (color-icon (ui-c7 (appstate-ui a))))
           (define C8 (color-icon (ui-c8 (appstate-ui a))))
-          (define C9 (color-icon (ui-c9 (appstate-ui a)))))
+          (define C9 (color-icon (ui-c9 (appstate-ui a))))
+          (define hover (ui-hover (appstate-ui a))))
   (cond
     [(false? hover) a]
     [(equal? hover SAVE)
      (save a)]
-    [(equal? hover LOAD)
-     (load a)]
     [(equal? hover UNDO)
      (undo a)]
     [(equal? hover REDO)
@@ -951,16 +1277,39 @@
      (update a "mode" "outline" #false)]
     [(equal? hover SOLID-ICON)
      (update a "mode" "solid" #false)]
+    [(equal? hover RECTANGLE-ICON)
+     (update a "type" "rectangle" #false)]
+    [(equal? hover SQUARE-ICON)
+     (update a "type" "square" #false)]
+    [(equal? hover CIRCLE-ICON)
+     (update a "type" "circle" #false)]
+    [(equal? hover ELLIPSE-ICON)
+     (update a "type" "ellipse" #false)]
+    [(equal? hover LINE-ICON)
+     (update a "type" "line" #false)]
+    [(equal? hover FREE-ICON)
+     (update a "type" "free" #false)]
     [(equal? hover ERASER)
-     (update a "tool" "eraser" #false)]
+     (update a "type" "eraser" #false)]
     [(equal? hover FILL)
-     (update a "tool" "fill" #false)]
+     (update a "type" "fill" #false)]
     [else a])))
 
 ; UI Rendering --------------------------------------------------------------------
 
 ; str->icon : String -> Image
 ; take a string and return the corresponding icon it represents
+
+; Examples
+(check-expect (str->icon "save") SAVE)
+
+(check-expect (str->icon "solid") SOLID-ICON)
+
+(check-expect (str->icon "pencil") #false)
+
+(check-expect (str->icon "eraser") ERASER)
+
+; Code
 (define (str->icon s)
   (cond
     [(string=? s "save") SAVE]
@@ -990,7 +1339,23 @@
 ; draw-selected-ui : AppState -> Image
 ; draws a triangle pointing to the selected tools/tool values
 ; ie, a type, color, size, and mode
-; (define (draw-selected-ui a) empty-image)
+
+; Examples
+
+(check-expect (draw-selected-ui IS)
+              (place-images
+               (list (rotate 270 (triangle 30 "solid" "light red"))
+                     (rotate 270 (triangle 30 "solid" "light red"))
+                     (rotate 270 (triangle 30 "solid" "light red"))
+                     (rotate 270 (triangle 30 "solid" "light red")))
+               (list
+                (make-posn 170 650)
+                (make-posn 135 220)
+                (make-posn 30 310)
+                (make-posn 225 95))
+               (rectangle UI-W UI-H "solid" "transparent")))
+
+; Code
 (define (draw-selected-ui a)
   (local ((define POINTER
             (rotate 270 (triangle 30 "solid" "light red")))
@@ -1036,8 +1401,8 @@
 ; Save Function
 
 ;; Input/Output
-; save : AppState -> AppState
-; takes an appstate, saves the current canvas as PNG and returns the appstate unchanged
+; save : AppState String -> AppState
+; takes an appstate, saves the current canvas as PNG with the name String and returns the appstate unchanged
 ; header: (define (save app) #true)
 
 (define (save app)
@@ -1066,33 +1431,6 @@
     [else (number->string n)]))
 
 ; ==================================================================================================
-; Load Function
-
-;; Input/Output
-; save : Image -> AppState
-; takes an image, loads a PNG image to the current canvas and returns the appstate with the loaded image.
-; header: (define (load app) #true)
-
-(define (load app)
-  (make-appstate (bitmap/file (string-append "img" (loaded-image-number 0 1) ".png"))                                   
-                 (appstate-pre app)
-                 (appstate-post app)
-                 (appstate-tool app)
-                 (appstate-ui app)
-                 #false))
-
-;; Input/Output
-; loaded-image-number : Number -> String
-; returns the last (represented as string) image
-; header: (define (loaded-image-number 0 1) )
-
-(define (loaded-image-number m o)
-  (cond
-    [(file-exists? (string-append "img" (number->string o) ".png"))
-     (loaded-image-number (add1 m) (add1 o))]
-    [else (number->string m)]))
-
-; ==================================================================================================
 ; Mouse Handler
 
 ;; Input/output
@@ -1107,7 +1445,7 @@
           (define post (appstate-post a))
           (define ui (appstate-ui a))
           (define hover (ui-hover ui))
-          ; tool values(start-app MAX-W MAX-H BG-COLOR)
+          ; tool values
           (define type (tool-type (appstate-tool a)))
           (define size (tool-size (appstate-tool a)))
           (define color (tool-color (appstate-tool a)))
@@ -1121,7 +1459,7 @@
          [(string=? me "move")
           (update a "hover" (get-hover x y) #false)]
          [(string=? me "button-down")
-          (select-from-ui a hover)] ; select option the mouse is hovering (if any)
+          (select-from-ui a)] ; select option the mouse is hovering (if any)
          [else a])]
       ; is mouse in canvas area?
       [(and (<= x (image-width canvas))
@@ -1246,7 +1584,6 @@
           [(string=? k "k") (update a "mode" "solid" #false)]   ; change tool mode
           [(string=? k "j") (update a "mode" "outline" #false)] ; current keys are placeholder
           [(string=? k "a") (save a)]
-          [(string=? k "d") (load a)]
           [(string=? k "q") (quit-app a)]
           [else a])))
 
