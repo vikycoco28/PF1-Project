@@ -1047,12 +1047,23 @@
 ; header: (define (load app) #true)
 
 (define (load app)
-  (make-appstate (bitmap/file "img0.png")                                   
+  (make-appstate (bitmap/file (string-append "img" (loaded-image-number 0 1) ".png"))                                   
                  (appstate-pre app)
                  (appstate-post app)
                  (appstate-tool app)
                  (appstate-ui app)
                  #false))
+
+;; Input/Output
+; loaded-image-number : Number -> String
+; returns the last (represented as string) image
+; header: (define (loaded-image-number 0 1) )
+
+(define (loaded-image-number m o)
+  (cond
+    [(file-exists? (string-append "img" (number->string o) ".png"))
+     (loaded-image-number (add1 m) (add1 o))]
+    [else (number->string m)]))
 
 ; ==================================================================================================
 ; Mouse Handler
