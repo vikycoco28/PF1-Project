@@ -19,9 +19,8 @@
 ; where type : String
 ;       size : Number
 ;       color : Color 
-;       mode : String or Number
+;       mode : String
 ;              represents the mode for the figures ("outline" or "solid")        
-;              (it can also be a number from 0 to 255 that indicates its transparency, with 0 being fully transparent and 255 being "solid")
 ;       x1, y1, x2, y2 : Number
 ;                        represent the coordinates of the current figure/tool
 ;       extra: Any
@@ -142,19 +141,30 @@
 ; takes an image and two coordinates and returns the color in that point of the image
 ; header: (define (get-color img x y) "red")
 
+;; Examples
+(check-expect (get-color (square 1 "solid" "white") 0 0)
+              (make-color 255 255 255))
+(check-expect (get-color (square 1 "solid" "green") 0 0)
+              (make-color 0 255 0))
+
+;; Code
 (define (get-color i x y)
   (first (image->color-list
           (crop x y 1 1 i))))
 
-;; Iput/Output
+;; Input/Output
 ; get-color-canvas : AppState -> Color
 ; takes an appstate and returns the initial color of the canvas
 ; header: (define (get-color-canvas app) "red")
 
+;; Examples
+(check-expect (get-color-canvas IS) (make-color 255 255 255))
+
+;; Code
 (define (get-color-canvas app)
   (cond
     [(empty? (appstate-pre app))
-     (get-color (appstate-canvas app))]
+     (get-color (appstate-canvas app) 1 1)]
     [(empty? (rest (appstate-pre app)))
      (get-color (first (appstate-pre app)) 1 1)]
     [else
@@ -337,6 +347,26 @@
 ; draw-figure : AppState -> Image
 ; it takes an AppState and returns the Canvas with the currently drawn figure (square, rectangle, circle or ellipse)
 
+;; Examples
+(check-expect (draw-figure
+               (make-appstate
+                EMPTY-CANVAS
+                '()
+                '()
+                (make-tool "square" 1 (ui-c9 START-UI) "outline" 0 0 20 30 #false #false)
+                START-UI
+                #false))
+               (place-image (square 20 "outline" "black") 10 10 EMPTY-CANVAS))
+(check-expect (draw-figure
+               (make-appstate
+                EMPTY-CANVAS
+                '()
+                '()
+                (make-tool "ellipse" 1 "green" "solid" 50 30 100 150 #false #false)
+                START-UI
+                #false))
+               (place-image (ellipse 50 120 "solid" "green") 75 90 EMPTY-CANVAS))
+
 ;; Code
 (define (draw-figure app)
   (local
@@ -386,6 +416,14 @@
 ; figure-height : Tool -> Number
 ; takes a tool and return the height of the currently drawn rectangle
 
+;; Examples
+(check-expect (figure-height
+               (make-tool "circle" 1 (ui-c9 START-UI) "outline" 0 0 20 30 #false #false))
+              20)
+(check-expect (figure-height
+               (make-tool "rectangle" 1 (ui-c9 START-UI) "outline" 0 0 20 30 #false #false))
+              30)
+               
 ;: Code
 (define (figure-height t)
   (local ((define X1 (tool-x1 t))
@@ -404,6 +442,14 @@
 ;; Input/Output
 ; figure-width : Tool -> Number
 ; takes a tool and return the width of the currently drawn figure
+
+;; Examples
+(check-expect (figure-width
+               (make-tool "square" 1 (ui-c9 START-UI) "outline" 20 30 0 0 #false #false))
+              20)
+(check-expect (figure-width
+               (make-tool "ellipse" 1 (ui-c9 START-UI) "outline" 20 30 0 0 #false #false))
+              20)
 
 ;: Code
 (define (figure-width t)
@@ -425,6 +471,23 @@
 ;; Input/Output
 ; add-figure-to-canvas : AppState -> AppState
 ; takes an appstate and returns the appstate with the currently drawn figure added to the canvas
+
+;; Examples
+(check-expect (add-figure-to-canvas
+               (make-appstate
+                EMPTY-CANVAS
+                '()
+                '()
+                (make-tool "square" 1 (ui-c9 START-UI) "outline" 0 0 20 30 #false #false)
+                START-UI
+                #false))
+              (make-appstate
+                (place-image (square 20 "outline" "black") 10 10 EMPTY-CANVAS)
+                (cons EMPTY-CANVAS '())
+                '()
+                (make-tool "square" 1 (ui-c9 START-UI) "outline" 0 0 0 0 #false #false)
+                START-UI
+                #false))       
 
 ;; Code
 (define (add-figure-to-canvas app)
@@ -455,6 +518,24 @@
 ; it takes an AppState and new end coordinates New-x and New-y
 ; and returns the Appstate where the current tool’s end point is at coordinates New-x and New-y
 
+;; Examples
+(check-expect (move-end
+               (make-appstate
+                EMPTY-CANVAS
+                '()
+                '()
+                (make-tool "square" 1 (ui-c9 START-UI) "outline" 0 0 20 30 #false #false)
+                START-UI
+                #false)
+               50 80)
+              (make-appstate
+                EMPTY-CANVAS
+                '()
+                '()
+                (make-tool "square" 1 (ui-c9 START-UI) "outline" 0 0 50 80 #false #false)
+                START-UI
+                #false))   
+
 ;; Code
 (define (move-end app new-x new-y)
   (if (boolean? (tool-type (appstate-tool app))) app 
@@ -479,7 +560,26 @@
 
 ;; Input/Output
 ; fill : AppState -> AppState
+; it takes an appstate and returns the appstate with the canvas filled with the selected color
 
+;; Examples
+(check-expect (fill
+               (make-appstate
+                EMPTY-CANVAS
+                '()
+                '()
+                (make-tool "square" 1 "blue" "outline" 0 0 0 0 #false #false)
+                START-UI
+                #false))
+              (make-appstate
+                (rectangle 1800 1000 "solid" "blue")
+                (cons EMPTY-CANVAS '())
+                '()
+                (make-tool "square" 1 "blue" "outline" 0 0 0 0 #false #false)
+                START-UI
+                #false))   
+
+;; Code
 (define (fill app)
   (local ((define COLOR (tool-color (appstate-tool app))))
    (make-appstate 
@@ -730,7 +830,7 @@
 (define UI-BASE
   (place-images
    LOI
-   LOC
+   LOC  
    UI-BG))
 
 ; Getting info from the UI -------------------------------------------------------------------
@@ -909,8 +1009,8 @@
 ; Save Function
 
 ;; Input/Output
-; save : AppState String -> AppState
-; takes an appstate, saves the current canvas as PNG with the name String and returns the appstate unchanged
+; save : AppState -> AppState
+; takes an appstate, saves the current canvas as PNG and returns the appstate unchanged
 ; header: (define (save app) #true)
 
 (define (save app)
@@ -953,7 +1053,7 @@
           (define post (appstate-post a))
           (define ui (appstate-ui a))
           (define hover (ui-hover ui))
-          ; tool values
+          ; tool values(start-app MAX-W MAX-H BG-COLOR)
           (define type (tool-type (appstate-tool a)))
           (define size (tool-size (appstate-tool a)))
           (define color (tool-color (appstate-tool a)))
@@ -1102,6 +1202,17 @@
 ; set quit field of the appstate to #false
 ; header: (define (quit-app appstate) app)
 
+;; Examples
+(check-expect (quit-app IS)
+              (make-appstate
+               EMPTY-CANVAS
+               '()
+               '()
+               (make-tool "free" 1 (ui-c9 START-UI) "outline" 0 0 0 0 #false #false)
+               START-UI
+               #true))
+
+;; Code
 (define (quit-app app)
   (make-appstate
    (appstate-canvas app)
@@ -1116,6 +1227,17 @@
 ; it takes an AppState and returns a Boolean indicating whether the app has quit or not.
 ; header: (define (quit? appstate) #true)
 
+;; Examples
+(check-expect (quit?
+               (make-appstate
+                EMPTY-CANVAS
+                '()
+                '()
+                (make-tool "free" 1 (ui-c9 START-UI) "outline" 0 0 0 0 #false #false)
+                START-UI
+                #true))
+              #true)
+
 ;; Code
 (define (quit? app) (appstate-quit app))
 
@@ -1126,6 +1248,7 @@
 ; it takes a number n and starts the application with an initial size n
 ; header: (define (start-app n) app)
 
+;; Code
 (define (start-app width height color)
   (draw-app (make-appstate
              (rectangle width height "solid" color)
