@@ -322,7 +322,17 @@
 ; update appstate with freehand line drawn on the canvas
 ; (define (add-free-to-canvas a) a)
 (define (add-free-to-canvas a)
-  (local ((define TYPE (tool-type (appstate-tool a))))
+  (local ((define TYPE (tool-type (appstate-tool a)))
+          (define SEL (ui-sel (appstate-ui a))) 
+          (define C1 (ui-c1 (appstate-ui a)))
+          (define C2 (ui-c2 (appstate-ui a)))
+          (define C3 (ui-c3 (appstate-ui a)))
+          (define C4 (ui-c4 (appstate-ui a)))
+          (define C5 (ui-c5 (appstate-ui a)))
+          (define C6 (ui-c6 (appstate-ui a)))
+          (define C7 (ui-c7 (appstate-ui a)))
+          (define C8 (ui-c8 (appstate-ui a)))
+          (define C9 (ui-c9 (appstate-ui a))))
   (make-appstate
    (draw-free a) ; use draw-free to get the canvas with the freehand line drawn
    (cons (appstate-canvas a)
@@ -330,9 +340,17 @@
    '()
    (make-tool (tool-type (appstate-tool a))
               (tool-size (appstate-tool a))
-              (if (string=? "eraser" TYPE)
-                  "black"
-                  (tool-color (appstate-tool a)))
+              (cond                         ; set the color back to the one selected 
+                [(string=? SEL "c1") C1]
+                [(string=? SEL "c2") C2]
+                [(string=? SEL "c3") C3]
+                [(string=? SEL "c4") C4]
+                [(string=? SEL "c5") C5]
+                [(string=? SEL "c6") C6]
+                [(string=? SEL "c7") C7]
+                [(string=? SEL "c8") C8]
+                [(string=? SEL "c9") C9]
+                [else (tool-color (appstate-tool a))])
               (tool-mode (appstate-tool a))
               0 0 0 0  ; x1,y1,x2,y2 set to 0
               #false   ; set extra to #false
